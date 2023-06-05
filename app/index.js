@@ -1,10 +1,11 @@
-const { allowedDist } = require('../helper');
-const Print = require('./print');
+const { allowedDist, findDist, printBill } = require('../helper');
 
 module.exports = class App {
     constructor() {
-        this.driver = [];
-        this.rider = {};
+        this.driver = []; //drivers available
+        this.rider = {};  //riders booked
+        this.rideIds = {};  //current rides going on
+        this.matchedDrivers = {}; //drivers list for each rider
     }
 
     //add a driver
@@ -17,18 +18,13 @@ module.exports = class App {
         this.rider[id] = { x, y };
     }
 
-    //find the euclidian distance
-    findDist(a, b, x, y) {
-        return Math.sqrt(((a - x) ** 2) + ((b - y) ** 2));
-    }
-
     //match the rider
     match(id) {
         let { x, y } = this.rider[id];
 
         //find all drivers within 5km
         let nearestDriver = this.driver.filter((driver) => (
-            this.findDist(driver.x, driver.y, x, y) <= allowedDist)
+            findDist(driver.x, driver.y, x, y) <= allowedDist)
         );
 
         if (nearestDriver.length === 0) {
@@ -38,8 +34,8 @@ module.exports = class App {
 
         //sort them in increasing order of distance
         nearestDriver.sort((a, b) => {
-            let aDist = this.findDist(a.x, a.y, x, y);
-            let bDist = this.findDist(b.x, b.y, x, y);
+            let aDist = findDist(a.x, a.y, x, y);
+            let bDist = findDist(b.x, b.y, x, y);
 
             if (aDist === bDist) {
                 return a.id - b.id;
@@ -47,6 +43,9 @@ module.exports = class App {
                 return aDist - bDist;
             }
         })
+
+        //add to matched drivers
+        this.matchedDrivers[id] = nearestDriver;
 
         //print all matched driver
         let driversList = ""
@@ -56,12 +55,43 @@ module.exports = class App {
         console.log("DRIVERS_MATCHED", driversList);
     }
 
-    startRide(line) {
+    startRide({ rideId, n, riderId }) {
+        let foundDrivers = this.matchedDrivers[riderId];
 
+        //if rideId already there or no drivers available or selected n is bigger than the driver list
+        if (this.rideIds[rideId] || foundDrivers.length === 0 || foundDrivers.length < n) {
+            console.log('INVALID_RIDE');
+            return;
+        }
+
+        //start the ride
+        this.rideIds[rideId] = { riderId, driverId: this.matchedDrivers[riderId][n - 1], start: this.rider[riderId] }
+        console.log('RIDE_STARTED', rideId);
     }
 
-    stopRide(line) {
+    stopRide({ rideId, destX, destY, time }) {
+        //find the ride
+        if (this.rideIds[rideId]) {
+            this.rideIds[rideId]["stopped"] = true;
+            this.rideIds[rideId]["time"] = time;
+            this.rideIds[rideId]["dest"] = { destX, destY };
+            console.log('RIDE STOPPED', rideId);
+        } else {
+            console.log('INVALID_RIDE');
+        }
+    }
 
+    print(rideId) {
+        if (!this.rideIds[rideId]) {
+            console.log('INVALID_RIDE');
+            return;
+        }
+        else if (!this.rideIds[rideId]["stopped"]) {
+            console.log('RIDE_NOT_COMPLETED');
+        } else {
+            let rideDetails = this.rideIds[rideId];
+            printBill(rideId, rideDetails.driverId["id"], rideDetails.start, rideDetails.dest, rideDetails.time);
+        }
     }
 
     start(data) {
@@ -91,14 +121,25 @@ module.exports = class App {
                     break;
 
                 case 'START_RIDE':
-                    this.startRide(line);
+                    this.startRide({
+                        rideId: line[1],
+                        n: line[2],
+                        riderId: line[3]
+                    });
                     break;
 
                 case 'STOP_RIDE':
-                    this.stopRide(line);
+                    this.stopRide({
+                        rideId: line[1],
+                        destX: line[2],
+                        destY: line[3],
+                        time: line[4]
+                    });
+                    break;
 
                 case 'BILL':
-                    return Print(this.rideId, this.driveId, this.distance, this.timeSpent);
+                    this.print(line[1]);
+                    break;
             }
         }
     }
