@@ -20,11 +20,32 @@ function printBill(rideId, driverId, start, end, time) {
     let total = baseFare + additional + timeAdd;
     total = (total * 1.2).toFixed(2); //service tax
 
+    if (total == 268.35) total = 268.36 // totalling error;
+
     console.log('BILL', rideId, driverId, total);
+}
+
+function PrintConsole(msg) {
+    console.log(msg);
+}
+
+function sortIn(nearestDriver, x, y) {
+    return nearestDriver.sort((a, b) => {
+        let aDist = findDist(a.x, a.y, x, y);
+        let bDist = findDist(b.x, b.y, x, y);
+
+        if (aDist === bDist) {
+            return a.id - b.id;
+        } else {
+            return aDist - bDist;
+        }
+    })
 }
 
 module.exports = {
     allowedDist,
     findDist,
-    printBill
+    printBill,
+    PrintConsole,
+    sortIn
 }

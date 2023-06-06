@@ -1,4 +1,4 @@
-const { allowedDist, findDist, printBill } = require('../helper');
+const { allowedDist, findDist, printBill, PrintConsole, sortIn } = require('../helper');
 
 module.exports = class App {
     constructor() {
@@ -28,21 +28,12 @@ module.exports = class App {
         );
 
         if (nearestDriver.length === 0) {
-            console.log('NO_DRIVERS_AVAILABLE');
+            PrintConsole('NO_DRIVERS_AVAILABLE');
             return;
         }
 
         //sort them in increasing order of distance
-        nearestDriver.sort((a, b) => {
-            let aDist = findDist(a.x, a.y, x, y);
-            let bDist = findDist(b.x, b.y, x, y);
-
-            if (aDist === bDist) {
-                return a.id - b.id;
-            } else {
-                return aDist - bDist;
-            }
-        })
+        nearestDriver = sortIn(nearestDriver, x, y);
 
         //add to matched drivers
         this.matchedDrivers[id] = nearestDriver;
@@ -52,42 +43,47 @@ module.exports = class App {
         nearestDriver.map((driver) => {
             driversList += driver.id + " ";
         })
-        console.log("DRIVERS_MATCHED", driversList);
+        PrintConsole(`DRIVERS_MATCHED ${driversList.trim()}`);
     }
 
     startRide({ rideId, n, riderId }) {
-        let foundDrivers = this.matchedDrivers[riderId];
+        let foundDrivers = this.matchedDrivers[riderId] ? this.matchedDrivers[riderId] : [];
 
         //if rideId already there or no drivers available or selected n is bigger than the driver list
         if (this.rideIds[rideId] || foundDrivers.length === 0 || foundDrivers.length < n) {
-            console.log('INVALID_RIDE');
+            PrintConsole('INVALID_RIDE');
             return;
         }
 
         //start the ride
         this.rideIds[rideId] = { riderId, driverId: this.matchedDrivers[riderId][n - 1], start: this.rider[riderId] }
-        console.log('RIDE_STARTED', rideId);
+
+        //remove from available riders list
+        let index = this.driver.indexOf(this.matchedDrivers[riderId][n - 1]);
+        this.driver.splice(index, 1);
+
+        PrintConsole(`RIDE_STARTED ${rideId}`);
     }
 
     stopRide({ rideId, destX, destY, time }) {
         //find the ride
-        if (this.rideIds[rideId]) {
+        if (this.rideIds[rideId] && !this.rideIds[rideId]["stopped"]) {
             this.rideIds[rideId]["stopped"] = true;
             this.rideIds[rideId]["time"] = time;
             this.rideIds[rideId]["dest"] = { destX, destY };
-            console.log('RIDE STOPPED', rideId);
+            PrintConsole(`RIDE_STOPPED ${rideId}`);
         } else {
-            console.log('INVALID_RIDE');
+            PrintConsole('INVALID_RIDE');
         }
     }
 
     print(rideId) {
         if (!this.rideIds[rideId]) {
-            console.log('INVALID_RIDE');
+            PrintConsole('INVALID_RIDE');
             return;
         }
         else if (!this.rideIds[rideId]["stopped"]) {
-            console.log('RIDE_NOT_COMPLETED');
+            PrintConsole('RIDE_NOT_COMPLETED');
         } else {
             let rideDetails = this.rideIds[rideId];
             printBill(rideId, rideDetails.driverId["id"], rideDetails.start, rideDetails.dest, rideDetails.time);
@@ -143,8 +139,4 @@ module.exports = class App {
             }
         }
     }
-
-
-
-
 }
